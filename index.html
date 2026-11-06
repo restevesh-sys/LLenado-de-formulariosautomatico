@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auditoría de levantamiento · llenado desde KMZ</title>
+  
+  <!-- Carga prioritaria de JSZip desde CDN seguro -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0d1520;
+      --card-bg: #132235;
+      --text-main: #f0f4f8;
+      --text-muted: #8b9bb4;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --border: #23354d;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background-color: #1a2e47;
+    }
+
+    .btn-upload {
+      background-color: var(--primary);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+
+    .btn-upload:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .dropzone-text {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .status-msg {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      min-height: 22px;
+    }
+
+    .status-msg.error {
+      color: var(--danger);
+    }
+
+    .status-msg.success {
+      color: var(--success);
+    }
+
+    .card-notice {
+      margin-top: 24px;
+      border: 1px dashed var(--border);
+      background: rgba(19, 34, 53, 0.4);
+      padding: 14px 18px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .card-notice strong {
+      color: var(--text-main);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .stat-box {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-box input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-top: 4px;
+      outline: none;
+    }
+
+    .actions-bar {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn-secondary:hover {
+      background-color: #1a2e47;
+    }
+
+    .preview-table {
+      width: 100%;
+      margin-top: 24px;
+      border-collapse: collapse;
+      background-color: var(--card-bg);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .preview-table th, .preview-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .preview-table th {
+      background-color: #182c44;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Auditoría de levantamiento · llenado desde KMZ</h1>
+
+    <!-- Contenedor Drag & Drop -->
+    <div class="dropzone" id="dropArea">
+      <input type="file" id="fileInput" accept=".kmz,.kml" style="display: none;">
+      <button class="btn-upload" onclick="document.getElementById('fileInput').click()">Abrir KMZ / KML</button>
+      <span class="dropzone-text">o arrastra aquí el archivo .kmz / .kml del levantamiento</span>
+    </div>
+
+    <!-- Mensaje de estado -->
+    <div class="status-msg" id="statusMsg"></div>
+
+    <!-- Declaratoria -->
+    <div class="card-notice">
+      <strong>Declaratoria de Privacidad y Creación:</strong>
+      Esta aplicación web corre exclusivamente en el navegador local (sin servidores backend externos). Los datos procesados no se suben a ninguna base de datos ajena y el código fuente opera de forma auditable.
+    </div>
+
+    <!-- Configuración y parámetros -->
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">% A Auditar</div>
+        <input type="number" id="porcentajeAuditar" value="10">
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Máx. M Por Punto</div>
+        <input type="number" id="maxMetros" value="400">
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Mínimo de Puntos</div>
+        <input type="number" id="minPuntos" value="3">
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Radio Potenciales (M)</div>
+        <input type="number" id="radioPotenciales" value="40">
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Supervisor de Auditoría</div>
+        <input type="text" id="supervisor" placeholder="Nombre completo">
+      </div>
+    </div>
+
+    <!-- Barra de acciones -->
+    <div class="actions-bar">
+      <button class="btn-secondary" id="btnOpciones">Opciones de auditoría</button>
+      <button class="btn-secondary" id="btnRegenerar">Regenerar puntos</button>
+      <button class="btn-secondary" id="btnPuntoManual">+ Punto manual</button>
+    </div>
+
+    <!-- Vista de capas encontradas -->
+    <table class="preview-table" id="tablaCapas" style="display: none;">
+      <thead>
+        <tr>
+          <th>Capa / Elemento</th>
+          <th>Tipo</th>
+          <th>Coordenadas / Atributos</th>
+        </tr>
+      </thead>
+      <tbody id="listaCapas"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const statusMsg = document.getElementById('statusMsg');
+    const tablaCapas = document.getElementById('tablaCapas');
+    const listaCapas = document.getElementById('listaCapas');
+
+    // Drag & Drop visual
+    ['dragenter', 'dragover'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropArea.addEventListener(name, (e) => {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+      });
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length) procesarArchivo(files[0]);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) procesarArchivo(e.target.files[0]);
+    });
+
+    function setStatus(text, isError = false) {
+      statusMsg.textContent = text;
+      statusMsg.className = 'status-msg ' + (isError ? 'error' : 'success');
+    }
+
+    async function procesarArchivo(file) {
+      setStatus('Procesando archivo: ' + file.name + '...');
+      const nombre = file.name.toLowerCase();
+
+      try {
+        if (nombre.endsWith('.kmz')) {
+          // Verificación de JSZip precargado
+          if (typeof JSZip === 'undefined') {
+            throw new Error('No se encontró el lector JSZip. Abre el archivo .kml descomprimido.');
+          }
+          
+          const zip = new JSZip();
+          const contenidoZip = await zip.loadAsync(file);
+          
+          // Buscar el primer archivo con extensión .kml adentro
+          let kmlFileName = Object.keys(contenidoZip.files).find(name => name.toLowerCase().endsWith('.kml'));
+          if (!kmlFileName) {
+            throw new Error('El archivo KMZ no contiene ningún archivo .kml válido adentro.');
+          }
+
+          const kmlTexto = await contenidoZip.file(kmlFileName).async('string');
+          parsearKML(kmlTexto, file.name);
+
+        } else if (nombre.endsWith('.kml')) {
+          const reader = new FileReader();
+          reader.onload = (e) => parsearKML(e.target.result, file.name);
+          reader.readAsText(file);
+        } else {
+          throw new Error('Formato no válido. Debe ser un archivo .kmz o .kml.');
+        }
+      } catch (err) {
+        setStatus('Error al abrir el archivo: ' + err.message, true);
+      }
+    }
+
+    function parsearKML(kmlText, fileName) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+      const placemarks = xmlDoc.getElementsByTagName('Placemark');
+
+      listaCapas.innerHTML = '';
+
+      if (placemarks.length === 0) {
+        setStatus('Archivo ' + fileName + ' cargado, pero no se encontraron elementos Placemark.', true);
+        tablaCapas.style.display = 'none';
+        return;
+      }
+
+      for (let i = 0; i < placemarks.length; i++) {
+        const item = placemarks[i];
+        const nameNode = item.getElementsByTagName('name')[0];
+        const name = nameNode ? nameNode.textContent : 'Sin nombre';
+
+        let tipo = 'Desconocido';
+        let coords = '-';
+
+        if (item.getElementsByTagName('Point').length) {
+          tipo = 'Punto';
+          coords = item.getElementsByTagName('coordinates')[0]?.textContent.trim() || '-';
+        } else if (item.getElementsByTagName('LineString').length) {
+          tipo = 'Línea / Ruta';
+          coords = 'Coordenadas de trazo';
+        } else if (item.getElementsByTagName('Polygon').length) {
+          tipo = 'Polígono';
+          coords = 'Área delimitada';
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><strong>${name}</strong></td><td>${tipo}</td><td>${coords.substring(0, 45)}...</td>`;
+        listaCapas.appendChild(tr);
+      }
+
+      tablaCapas.style.display = 'table';
+      setStatus('Levantamiento cargado correctamente (' + placemarks.length + ' elementos encontrados).');
+    }
+  </script>
+</body>
+</html>
